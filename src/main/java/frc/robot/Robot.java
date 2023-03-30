@@ -35,7 +35,7 @@ public class Robot extends TimedRobot {
   
 
   // https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method
-  static final double GYRO_CONTROLLED_MAX_OUTPUT = 0.12; // tune it (.25 to .5)
+  static final double GYRO_CONTROLLED_MAX_OUTPUT = 0.13; // tune it (.25 to .5)
   static final double GYRO_TU = 1.0;  // Oscilatoin period - Tune it (0.5 to 2)
   static final double GYRO_KU = 1.0/15.0;  // ultimate gain at max angle 15
   static final double GYRO_TOLERANCE = 2.0; // Tolerance angle 
@@ -75,11 +75,11 @@ public class Robot extends TimedRobot {
   static final double ARM_KD = 0;
   private final PIDController npid = new PIDController(GYRO_KP, GYRO_KI, GYRO_KD);
   private final PIDController armPID = new PIDController(ARM_KP, ARM_KI, ARM_KD);
-  private final PIDController turn_controller = new PIDController(1.0/180, 0.0/180, 0.0/180);
+  private final PIDController turn_controller = new PIDController(2.0/180, 0.0/180, 0.0/180);
   /*
    * Drive motor controller instances.
    * 
-   * Change the id's to match your robot.
+   * Change the id's to match your robot.s
    * Change kBrushed to kBrushless if you are using NEO's.
    * Use the appropriate other class if you are using different controllers.
    */
@@ -307,6 +307,11 @@ public class Robot extends TimedRobot {
     driveLeftSpark2.setIdleMode(IdleMode.kBrake);
     driveRightSpark.setIdleMode(IdleMode.kBrake);
     driveRightSpark2.setIdleMode(IdleMode.kBrake);
+    driveLeftSpark.setOpenLoopRampRate(OpenLoopRamp);
+    driveLeftSpark2.setOpenLoopRampRate(OpenLoopRamp);
+    driveRightSpark.setOpenLoopRampRate(-OpenLoopRamp);
+    driveRightSpark2.setOpenLoopRampRate(-OpenLoopRamp);
+
     robotPosition = 0;
     robotStallInterval = 0;
 
@@ -336,6 +341,7 @@ public class Robot extends TimedRobot {
     return turn_controller.calculate(gyro.getAngle(),desired_angle);
   }
   
+  double gyro_max_pitch = 0.0;
 
   @Override
   public void autonomousPeriodic() { // If it is middle auton
@@ -436,7 +442,7 @@ public class Robot extends TimedRobot {
         } else {
 
           double rot = rotateRobot(180);
-          drive.setMaxOutput(0.4);
+          drive.setMaxOutput(.5);
           drive.curvatureDrive(0, rot, true);
           if (robotStallInterval < 5) {
             double curPosition = Math.abs(gyro.getAngle());
@@ -456,13 +462,17 @@ public class Robot extends TimedRobot {
         break;
 
     case 4:
-        // Back up to charge station
+        // Move forward to charge station
       drive.setMaxOutput(1.0);
-      if (Math.abs(gyro.getYComplementaryAngle()) < 10) { 
-        // double rot = rotateRobot(180);
+      double pitch = Math.abs(gyro.getYComplementaryAngle());
+      if (gyro_max_pitch < 13 ) {
+        //|| pitch > gyro_max_pitch - 1) { 
+      //if (pitch <10){
+        double rot = rotateRobot(180);
+        gyro_max_pitch = pitch;
         setArmMotor(0.0);
         setIntakeMotor(0.0, INTAKE_CURRENT_LIMIT_A);
-        drive.curvatureDrive(-AUTO_DRIVE_SPEED, 0, false);
+        drive.curvatureDrive(-AUTO_DRIVE_SPEED/2, rot*0.4, false);
         break;
       } else {
         autoStage++;
