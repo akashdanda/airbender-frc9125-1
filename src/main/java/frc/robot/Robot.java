@@ -222,7 +222,7 @@ public class Robot extends TimedRobot {
 
     npid.setTolerance(GYRO_TOLERANCE);
     armPID.setTolerance(arm_Tolerance);
-    turn_controller.setTolerance(2);
+    turn_controller.setTolerance(.1);
     gyro_init_angle = gyro.getYComplementaryAngle();
     SmartDashboard.putNumber("Gyro Initial Angle", gyro_init_angle);
   }
@@ -425,7 +425,7 @@ public class Robot extends TimedRobot {
         } else if (motorEncoder.getPosition() > autoBackupPosition) { 
           setArmMotor(0.0);
           setIntakeMotor(0.0, INTAKE_CURRENT_LIMIT_A);
-          drive.curvatureDrive(AUTO_DRIVE_SPEED / 2,0,false);
+          drive.curvatureDrive(AUTO_DRIVE_SPEED / 1.5,0,false);
         } else {
           autoStage++;
           autonomousStartTime = Timer.getFPGATimestamp();
@@ -465,7 +465,7 @@ public class Robot extends TimedRobot {
         // Move forward to charge station
       drive.setMaxOutput(1.0);
       double pitch = Math.abs(gyro.getYComplementaryAngle());
-      if (gyro_max_pitch < 13 ) {
+      if (timeElapsed < 2 || gyro_max_pitch < 13 ) {
         //|| pitch > gyro_max_pitch - 1) { 
       //if (pitch <10){
         double rot = rotateRobot(180);
@@ -498,7 +498,8 @@ public class Robot extends TimedRobot {
   double OpenLoopRamp=0.4;
   boolean Coast = true;
   boolean straight_mode = false;
-  double straight_angle = 0.0;
+  double straight_angle = 0;
+  boolean APressed = false;
   
   @Override
   public void teleopInit() {
@@ -523,6 +524,7 @@ public class Robot extends TimedRobot {
 
     SmartDashboard.putNumber("drive position",motorEncoder.getPosition());
     SmartDashboard.putBoolean("Coast", Coast);
+    SmartDashboard.putBoolean("A Pressed: ", APressed);
     // Arm control
     if (armEncoder.getPosition() < 0) {
       armEncoder.setPosition(0);
@@ -595,13 +597,14 @@ public class Robot extends TimedRobot {
       
     setIntakeMotor(intakePower, intakeAmps);
 
-    if(driverJoystick.getBButtonPressed()){
+    if(driverJoystick.getAButtonPressed()){
       if(Coast==true){
         driveLeftSpark.setIdleMode(IdleMode.kBrake);
    driveLeftSpark2.setIdleMode(IdleMode.kBrake);
       driveRightSpark.setIdleMode(IdleMode.kBrake);
       driveRightSpark2.setIdleMode(IdleMode.kBrake);
       Coast=false;
+      APressed = true;
 
       }else if(Coast==false){
         driveLeftSpark.setIdleMode(IdleMode.kCoast);
@@ -609,6 +612,7 @@ public class Robot extends TimedRobot {
       driveRightSpark.setIdleMode(IdleMode.kCoast);
       driveRightSpark2.setIdleMode(IdleMode.kCoast);
       Coast=true;
+      APressed = false;
       }
     }
 
@@ -620,7 +624,7 @@ public class Robot extends TimedRobot {
       levelRobot();
     } else {
       if (driverJoystick.getLeftTriggerAxis() != 0) {
-        drive.setMaxOutput(.25);
+        drive.setMaxOutput(.1);
       } else if (driverJoystick.getLeftBumper()) { //Changed from left bumper to right bumper
         drive.setMaxOutput( .35);
       }else if (driverJoystick.getRightTriggerAxis() != 0) {
@@ -641,6 +645,13 @@ public class Robot extends TimedRobot {
 
       var xSpeed = m_speedLimiter.calculate(-driverJoystick.getLeftY());
       var rot = m_rotLimiter.calculate(-driverJoystick.getRightX());
+      if (Math.abs(rot) > 0.05) {
+        straight_angle = gyro.getAngle();
+      }
+      else {
+        rot = turn_controller.calculate(gyro.getAngle(),straight_angle);
+      }
+
       boolean leftBumper = driverJoystick.getLeftBumper(); 
       if (driverJoystick.getPOV() != -1) {
         leftBumper=true;
@@ -654,18 +665,16 @@ public class Robot extends TimedRobot {
         }
         rot = turn_controller.calculate(gyro.getAngle(),desired_angle);
       }
-      if (straight_mode) {
-        while (straight_angle-gyro.getAngle() > 180) {
-          straight_angle -= 360;
-        }
-        while (gyro.getAngle()-straight_angle > 180) {
-          straight_angle += 360;
-        }
-        rot = turn_controller.calculate(gyro.getAngle(),straight_angle);
-      }
 
-      
       drive.curvatureDrive(xSpeed, rot, leftBumper);
     }
+  }
+
+  @Override
+  public void disabledPeriodic() {
+    driveLeftSpark.setIdleMode(IdleMode.kBrake);
+    driveLeftSpark2.setIdleMode(IdleMode.kBrake);
+    driveRightSpark.setIdleMode(IdleMode.kBrake);
+    driveRightSpark2.setIdleMode(IdleMode.kBrake);
   }
 }
