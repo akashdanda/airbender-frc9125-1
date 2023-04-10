@@ -111,7 +111,7 @@ public class Robot extends TimedRobot {
   CANSparkMax intake = new CANSparkMax(6, MotorType.kBrushless);
   
   public RelativeEncoder armEncoder = arm.getEncoder();
-  public RelativeEncoder motorEncoder = driveLeftSpark.getEncoder();
+  public RelativeEncoder motorEncoder = driveLeftSpark2.getEncoder();
   /**
    * The starter code uses the most generic joystick class.
    * 
@@ -193,7 +193,7 @@ public class Robot extends TimedRobot {
     m_chooser.addOption("Right", kRightAuto);
     SmartDashboard.putData("Auto choices", m_chooser);
     
-    CameraServer.startAutomaticCapture(0);
+    //CameraServer.startAutomaticCapture(0);
     
     /*
      * You will need to change some of these from false to true.
@@ -276,7 +276,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("POV Data: ",driverJoystick.getPOV());
     SmartDashboard.putNumber("drive position",motorEncoder.getPosition());
     SmartDashboard.putNumber("curr angle",gyro.getYComplementaryAngle());
-    
+    SmartDashboard.putNumber("arm position",armEncoder.getPosition());
     if (armEncoder.getPosition() < 0) {
       armEncoder.setPosition(0);
     }
@@ -299,9 +299,9 @@ public class Robot extends TimedRobot {
   int robotStallInterval = 0;
   @Override
   public void autonomousInit() { 
-
+    motorEncoder.setPosition(0);
     gyro.reset();
-
+    double Current_POS;
     motorEncoder.setPosition(0);
     driveLeftSpark.setIdleMode(IdleMode.kBrake);
     driveLeftSpark2.setIdleMode(IdleMode.kBrake);
@@ -321,7 +321,7 @@ public class Robot extends TimedRobot {
     autonomousIntakePower = INTAKE_OUTPUT_POWER;
 
     if (m_autoSelected == kMiddleAuto) {
-      autoBackupPosition = 0;
+      autoBackupPosition = -40;
     } else {
       autoBackupPosition = -60;
     }
@@ -373,13 +373,16 @@ public class Robot extends TimedRobot {
       case 0:
         if (timeElapsed < ARM_EXTEND_TIME_S) {
           setArmMotor(-ARM_OUTPUT_POWER);
-          setIntakeMotor(-INTAKE_OUTPUT_POWER, INTAKE_CURRENT_LIMIT_A);
+          setIntakeMotor(0, 0);
           drive.curvatureDrive(0.0, 0.0, false);
           // stop moving arm
           // if time is less that time it takes for arm to extend + time it takes to throw
           // piece
           // use the intake
-        } else if (robotStallInterval < 5) {
+
+
+          
+         /*else if (robotStallInterval < 5) {
           double curPos = motorEncoder.getPosition();
           if (curPos - robotPosition < 0.00001) {
             robotStallInterval++;
@@ -393,8 +396,12 @@ public class Robot extends TimedRobot {
           setArmMotor(-ARM_OUTPUT_POWER/2);
           setIntakeMotor(-INTAKE_OUTPUT_POWER, INTAKE_CURRENT_LIMIT_A);
           drive.curvatureDrive(-AUTO_DRIVE_SPEED / 4, 0.0,false);
+          */
         } else {
+          armEncoder.setPosition(0);
+          drive.curvatureDrive(0.0, 0.0, false);
           autoStage++;
+          System.out.println(autoStage);
           autonomousStartTime = Timer.getFPGATimestamp();
           timeElapsed = 0;
         }
@@ -403,83 +410,82 @@ public class Robot extends TimedRobot {
     case 1: // Throwing  piece and moving back to start position
         if (timeElapsed <  AUTO_THROW_TIME_S) {
           setArmMotor(-ARM_OUTPUT_POWER/2);
-          setIntakeMotor(INTAKE_OUTPUT_POWER / 2, INTAKE_CURRENT_LIMIT_A);
+          setIntakeMotor(-INTAKE_OUTPUT_POWER / 3, INTAKE_CURRENT_LIMIT_A);
           drive.curvatureDrive(0.0, 0.0,false);
-        } else if (motorEncoder.getPosition() > 0) {
+        /* } else if (motorEncoder.getPosition() > 0) {
           setArmMotor(0.0);
           setIntakeMotor(0, 0);
-          drive.curvatureDrive(AUTO_DRIVE_SPEED / 4, 0.0,false);
+          drive.curvatureDrive(AUTO_DRIVE_SPEED / 4, 0.0,false);*/
         } else {
+          drive.curvatureDrive(0.0, 0.0, false);
           autoStage++;
+          System.out.println(autoStage);
           autonomousStartTime = Timer.getFPGATimestamp();
           timeElapsed = 0;
         }
         break;
         
     case 2: // Retracting arm and move out of community
-        if (armEncoder.getPosition()<ARM_END_POS) {
+        /*if (armEncoder.getPosition()<ARM_END_POS) {
            setArmMotor(ARM_OUTPUT_POWER);
            setIntakeMotor(0.0, INTAKE_CURRENT_LIMIT_A);
-           drive.curvatureDrive(0, 0, false);
+          // drive.curvatureDrive(0, 0, false);
           // drive backward
-        } else if (motorEncoder.getPosition() > autoBackupPosition) { 
-          setArmMotor(0.0);
+        }*/
+        if (motorEncoder.getPosition() > autoBackupPosition) { 
+          // System.out.println("position");
+          setArmMotor(ARM_OUTPUT_POWER);
           setIntakeMotor(0.0, INTAKE_CURRENT_LIMIT_A);
           drive.curvatureDrive(AUTO_DRIVE_SPEED / 1.5,0,false);
         } else {
+          drive.curvatureDrive(AUTO_DRIVE_SPEED / 1.5,0,false);
           autoStage++;
+          System.out.println(autoStage);
           autonomousStartTime = Timer.getFPGATimestamp();
           timeElapsed = 0;
           robotStallInterval = 0;
           robotPosition = 0;
         }
         break;
-    case 3: // charge station
-        if (m_autoSelected != kMiddleAuto) {
-          setArmMotor(0.0);
-          setIntakeMotor(0.0, INTAKE_CURRENT_LIMIT_A);
-          drive.curvatureDrive(0, 0.0,false);
-        } else {
-
-          double rot = rotateRobot(180);
-          drive.setMaxOutput(.5);
-          drive.curvatureDrive(0, rot, true);
-          if (robotStallInterval < 5) {
-            double curPosition = Math.abs(gyro.getAngle());
-            if (Math.abs(curPosition - robotPosition) < 0.1) {
-              robotStallInterval++;
-            } else {
-              robotStallInterval = 0;
-            }
-            robotPosition = Math.abs(gyro.getAngle());
-          } else {
-            motorEncoder.setPosition(0);
-            autoStage++;
-            autonomousStartTime = Timer.getFPGATimestamp();
-            timeElapsed = 0;   
-          } 
+    
+     case 3:
+        if(m_autoSelected != kMiddleAuto){
+          drive.curvatureDrive(0, 0, false);
+          setArmMotor(0);
+          setIntakeMotor(0, 0);
         }
-        break;
-
+        else if(motorEncoder.getPosition() > autoBackupPosition-25){
+          driveRightSpark.setIdleMode(IdleMode.kCoast);
+          driveLeftSpark.setIdleMode(IdleMode.kCoast);
+          driveLeftSpark2.setIdleMode(IdleMode.kCoast);
+          driveRightSpark2.setIdleMode(IdleMode.kCoast);
+          drive.curvatureDrive(AUTO_DRIVE_SPEED/4, 0.0, false);
+        } else {
+          autoStage++;
+          System.out.println(autoStage);
+          autonomousStartTime = Timer.getFPGATimestamp();
+          timeElapsed = 0;  
+        }
+    break;
     case 4:
-        // Move forward to charge station
-      drive.setMaxOutput(1.0);
-      double pitch = Math.abs(gyro.getYComplementaryAngle());
-      if (timeElapsed < 2 || gyro_max_pitch < 13 ) {
-        //|| pitch > gyro_max_pitch - 1) { 
-      //if (pitch <10){
-        double rot = rotateRobot(180);
-        gyro_max_pitch = pitch;
-        setArmMotor(0.0);
-        setIntakeMotor(0.0, INTAKE_CURRENT_LIMIT_A);
-        drive.curvatureDrive(-AUTO_DRIVE_SPEED/2, rot*0.4, false);
-        break;
-      } else {
-        autoStage++;
-        autonomousStartTime = Timer.getFPGATimestamp();
-        timeElapsed = 0;  
-      }
-  
+    double pitch = Math.abs(gyro.getYComplementaryAngle());
+    if(gyro_max_pitch<13){
+      driveRightSpark.setIdleMode(IdleMode.kBrake);
+      driveLeftSpark.setIdleMode(IdleMode.kBrake);
+      driveLeftSpark2.setIdleMode(IdleMode.kBrake);
+      driveRightSpark2.setIdleMode(IdleMode.kBrake);
+      gyro_max_pitch=pitch;
+      setArmMotor(0.0);
+      setIntakeMotor(0.0, INTAKE_CURRENT_LIMIT_A);
+      drive.curvatureDrive(-AUTO_DRIVE_SPEED/2, 0, false);
+      break;
+    }else {
+      autoStage++;
+      System.out.println(autoStage);
+      autonomousStartTime = Timer.getFPGATimestamp();
+      timeElapsed = 0;  
+    }
+
     case 5:
       levelRobot();
       break;
